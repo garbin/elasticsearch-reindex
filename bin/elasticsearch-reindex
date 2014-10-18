@@ -1,0 +1,76 @@
+#!/usr/bin/env node
+
+var cli           = require('commander'),
+    elasticsearch = require('elasticsearch')
+    async         = require('async'),
+    _             = require('underscore'),
+    pace          = require('pace')(100),
+    URI           = require('URIjs');
+
+cli
+.version('1.0.0')
+.option('-s, --src [value]', 'source index, eg. http://192.168.1.100:9200/{src_index}/{src_type}')
+.option('-d, --dest [value]', 'destination index, eg. http://192.168.1.100:9200/{dest_index}/{dest_type}')
+.option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
+.option('-b, --bulk [value]', 'bulk size for a thread', 100)
+.parse(process.argv);
+
+var src_uri      = new URI(cli.src),
+    dest_uri     = new URI(cli.dest),
+    src_client   = new elasticsearch.Client({host:src_uri.host()}),
+    dest_client  = new elasticsearch.Client({host:dest_uri.host()}),
+    src_path     = (function() { var tmp = src_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
+    dest_path    = (function() { var tmp = dest_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
+    scan_options = {
+      index       : src_path.index,
+      type        : src_path.type,
+      search_type : 'scan',
+      scroll      : '1m',
+      size        : cli.bulk
+    },
+    total = processed_total = 0;
+
+var reindex = function(docs, cb) {
+  if (!docs) {
+    return;
+  }
+  var chunks = _.toArray(_.groupBy(docs, function(item, index){ return Math.floor(index/cli.bulk); }));
+  async.eachLimit(chunks, cli.concurrency, function(chunk, cb) {
+    var bulk_data = [];
+    chunk.forEach(function(item) {
+      bulk_data.push({index:{_index:dest_path.index, _type:dest_path.type || item._type, _id: item._id}});
+      bulk_data.push(item._source);
+    });
+    dest_client.bulk({
+      body: bulk_data
+    }, function(err, res) {
+      processed_total += chunk.length;
+      pace.op(processed_total);
+      cb(err);
+    });
+  }, function(err) {
+    cb(err);
+  });
+};
+
+src_client.search(scan_options, function scroll_fetch(err, res) {
+  if (err) {
+    return console.log(err);
+  }
+  pace.total = res.hits.total;
+  total += res.hits.hits.length;
+  reindex(res.hits.hits, function(err) {
+    if (err) {
+      return console.log(err);
+    }
+    if (res.hits.total !== total) {
+      src_client.scroll({
+        scrollId : res._scroll_id,
+        scroll : '1m'
+      }, scroll_fetch);
+    } else {
+      console.log('All done ' + total);
+    }
+  });
+});
+
