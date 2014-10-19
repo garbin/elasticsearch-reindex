@@ -4,7 +4,6 @@ var cli           = require('commander'),
     elasticsearch = require('elasticsearch')
     async         = require('async'),
     _             = require('underscore'),
-    pace          = require('pace')(100),
     bunyan        = require('bunyan'),
     Indexer       = require('../lib/indexer'),
     URI           = require('URIjs');
@@ -17,9 +16,7 @@ var logger        = bunyan.createLogger({
 });
 
 cli
-.version('1.0.2')
-//.option('-x, --sync_settings', 'sync settings from source index')
-//.option('-m, --sync_mapping', 'sync mappings from source index')
+.version('1.0.3')
 .option('-s, --src [value]', 'source index, eg. http://192.168.1.100:9200/{src_index}/{src_type}')
 .option('-d, --dest [value]', 'destination index, eg. http://192.168.1.100:9200/{dest_index}/{dest_type}')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
@@ -43,7 +40,8 @@ var src_uri      = new URI(cli.src),
       size        : cli.bulk
     };
 
-var reindexer = new Indexer();
+var reindexer = new Indexer(),
+    pace          = require('pace')(100);
 
 reindexer.on('error', function(err) {
   logger.warn(err);
