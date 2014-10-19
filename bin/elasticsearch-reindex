@@ -17,7 +17,7 @@ var logger        = bunyan.createLogger({
 });
 
 cli
-.version('1.0.5')
+.version('1.0.6')
 .option('-s, --src [value]', 'source index, eg. http://192.168.1.100:9200/{src_index}/{src_type}')
 .option('-d, --dest [value]', 'destination index, eg. http://192.168.1.100:9200/{dest_index}/{dest_type}')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
@@ -70,13 +70,16 @@ src_client.search(scan_options, function scroll_fetch(err, res) {
     if (err) {
       return console.log(err);
     }
-    if (res.hits.total !== total) {
+    //if (res.hits.total !== total) {
+    console.log(total);
+    if (total <  1000) {
       src_client.scroll({
         scrollId : res._scroll_id,
         scroll : '1m'
       }, scroll_fetch);
     } else {
-      console.log('All done ' + total);
+      console.log("Reindexing finished!");
+      process.exit();
     }
   });
 });
