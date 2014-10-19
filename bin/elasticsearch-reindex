@@ -17,7 +17,7 @@ var logger        = bunyan.createLogger({
 });
 
 cli
-.version('1.0.0')
+.version('1.0.2')
 //.option('-x, --sync_settings', 'sync settings from source index')
 //.option('-m, --sync_mapping', 'sync mappings from source index')
 .option('-s, --src [value]', 'source index, eg. http://192.168.1.100:9200/{src_index}/{src_type}')
