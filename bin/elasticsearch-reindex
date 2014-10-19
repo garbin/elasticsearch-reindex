@@ -5,6 +5,7 @@ var cli           = require('commander'),
     async         = require('async'),
     _             = require('underscore'),
     bunyan        = require('bunyan'),
+    fs            = require('fs'),
     Indexer       = require('../lib/indexer'),
     URI           = require('URIjs');
 
@@ -16,7 +17,7 @@ var logger        = bunyan.createLogger({
 });
 
 cli
-.version('1.0.3')
+.version('1.0.4')
 .option('-s, --src [value]', 'source index, eg. http://192.168.1.100:9200/{src_index}/{src_type}')
 .option('-d, --dest [value]', 'destination index, eg. http://192.168.1.100:9200/{dest_index}/{dest_type}')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
@@ -31,7 +32,7 @@ var src_uri      = new URI(cli.src),
     dest_path    = (function() { var tmp = dest_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
     dest_uri     = new URI(cli.dest),
     total        = processed_total = 0,
-    custom_indexer = cli.args[0] ? require(cli.args[0]) : null;
+    custom_indexer = cli.args[0] ? require(fs.realpathSync(cli.args[0])) : null;
     scan_options = {
       index       : src_path.index,
       type        : src_path.type,

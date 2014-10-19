@@ -1,6 +1,6 @@
 {
   "name": "elasticsearch-reindex",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Elasticsearch reindex tool",
   "main": "index.js",
   "scripts": {
