@@ -15,7 +15,7 @@ Example
 
 Quick start: run the following command to reindex your data:
 ```
-$ elasticsearch-reindex -s http://192.168.1.100/old_index/old_type -d http://10.0.0.1/new_index/new_type -c 8 -b 50
+$ elasticsearch-reindex -s http://192.168.1.100/old_index/old_type -d http://10.0.0.1/new_index/new_type -b 100
 ```
 
 Use custom indexer:
@@ -36,5 +36,5 @@ module.exports = {
 
 Pass the script path to elasticsearch-reindex to reindex your data with it
 ```
-$ elasticsearch-reindex -s http://192.168.1.100/old_index/old_type -d http://10.0.0.1/new_index/new_type -c 8 -b 50 ./indexer.js
+$ elasticsearch-reindex -s http://192.168.1.100/old_index/old_type -d http://10.0.0.1/ -b 100 ./indexer.js
 ```
