@@ -5,10 +5,21 @@ var cli           = require('commander'),
     async         = require('async'),
     _             = require('underscore'),
     pace          = require('pace')(100),
+    bunyan        = require('bunyan'),
+    Indexer       = require('../lib/indexer'),
     URI           = require('URIjs');
+
+var logger        = bunyan.createLogger({
+  name: "elasticsearch-reindex",
+  streams: [{
+    path: "/var/log/elasticsearch-reindex.log"
+  }]
+});
 
 cli
 .version('1.0.0')
+//.option('-x, --sync_settings', 'sync settings from source index')
+//.option('-m, --sync_mapping', 'sync mappings from source index')
 .option('-s, --src [value]', 'source index, eg. http://192.168.1.100:9200/{src_index}/{src_type}')
 .option('-d, --dest [value]', 'destination index, eg. http://192.168.1.100:9200/{dest_index}/{dest_type}')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
@@ -21,37 +32,27 @@ var src_uri      = new URI(cli.src),
     dest_client  = new elasticsearch.Client({host:dest_uri.host()}),
     src_path     = (function() { var tmp = src_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
     dest_path    = (function() { var tmp = dest_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
+    dest_uri     = new URI(cli.dest),
+    total        = processed_total = 0,
+    custom_indexer = cli.args[0] ? require(cli.args[0]) : null;
     scan_options = {
       index       : src_path.index,
       type        : src_path.type,
       search_type : 'scan',
       scroll      : '1m',
       size        : cli.bulk
-    },
-    total = processed_total = 0;
+    };
 
-var reindex = function(docs, cb) {
-  if (!docs) {
-    return;
-  }
-  var chunks = _.toArray(_.groupBy(docs, function(item, index){ return Math.floor(index/cli.bulk); }));
-  async.eachLimit(chunks, cli.concurrency, function(chunk, cb) {
-    var bulk_data = [];
-    chunk.forEach(function(item) {
-      bulk_data.push({index:{_index:dest_path.index, _type:dest_path.type || item._type, _id: item._id}});
-      bulk_data.push(item._source);
-    });
-    dest_client.bulk({
-      body: bulk_data
-    }, function(err, res) {
-      processed_total += chunk.length;
-      pace.op(processed_total);
-      cb(err);
-    });
-  }, function(err) {
-    cb(err);
-  });
-};
+var reindexer = new Indexer();
+
+reindexer.on('error', function(err) {
+  logger.warn(err);
+});
+
+reindexer.on('success', function(num_of_success) {
+  processed_total += num_of_success;
+  pace.op(processed_total);
+});
 
 src_client.search(scan_options, function scroll_fetch(err, res) {
   if (err) {
@@ -59,7 +60,14 @@ src_client.search(scan_options, function scroll_fetch(err, res) {
   }
   pace.total = res.hits.total;
   total += res.hits.hits.length;
-  reindex(res.hits.hits, function(err) {
+  reindexer.index(res.hits.hits, {
+    concurrency : cli.concurrency,
+    bulk        : cli.bulk,
+    client      : dest_client,
+    indexer     : custom_indexer.index || null,
+    index       : dest_path.index,
+    type        : dest_path.type
+  }, function(err) {
     if (err) {
       return console.log(err);
     }
@@ -73,4 +81,3 @@ src_client.search(scan_options, function scroll_fetch(err, res) {
     }
   });
 });
-
