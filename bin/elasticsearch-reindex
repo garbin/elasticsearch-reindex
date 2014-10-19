@@ -70,15 +70,13 @@ src_client.search(scan_options, function scroll_fetch(err, res) {
     if (err) {
       return console.log(err);
     }
-    //if (res.hits.total !== total) {
-    console.log(total);
-    if (total <  1000) {
+    if (res.hits.total !== total) {
       src_client.scroll({
         scrollId : res._scroll_id,
         scroll : '1m'
       }, scroll_fetch);
     } else {
-      console.log("Reindexing finished!");
+      console.log("\n\nReindex processing finished! Total " + total + " documents have been reindexed");
       process.exit();
     }
   });
