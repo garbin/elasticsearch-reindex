@@ -52,4 +52,4 @@ Have fun!
 
 ## License
 
-Intervention Image is licensed under the [MIT License](http://opensource.org/licenses/MIT).
+elasticsearch-reindex is licensed under the [MIT License](http://opensource.org/licenses/MIT).
