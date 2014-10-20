@@ -21,7 +21,7 @@ $ elasticsearch-reindex -f http://192.168.1.100/old_index/old_type -t http://10.
 
 You can omit {new_index} and {new_type} if new index name and type name same as the old
 ```
-$ elasticsearch-reindex -f http://192.168.1.100/old_index/old_type -t http://10.0.0.1/new_index/new_type
+$ elasticsearch-reindex -f http://192.168.1.100/old_index/old_type -t http://10.0.0.1
 ```
 
 Advanced feature
