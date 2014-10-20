@@ -9,13 +9,6 @@ var cli           = require('commander'),
     Indexer       = require('../lib/indexer'),
     URI           = require('URIjs');
 
-var logger        = bunyan.createLogger({
-  src: true,
-  name: "elasticsearch-reindex",
-  streams: [{
-    path: "/var/log/elasticsearch-reindex.log"
-  }]
-});
 
 cli
 .version('1.0.7')
@@ -25,7 +18,16 @@ cli
 .option('-b, --bulk [value]', 'bulk size for a thread', 100)
 .option('-s, --scroll [value]', 'default 1m', '1m')
 .option('-o, --request_timeout [value]', 'default 60000', 60000)
+.option('-l, --log_path [value]', 'default ./reindex.log', './reindex.log')
 .parse(process.argv);
+
+var logger        = bunyan.createLogger({
+  src: true,
+  name: "elasticsearch-reindex",
+  streams: [{
+    path: cli.log_path
+  }]
+});
 
 var from_uri      = new URI(cli.from),
     to_uri     = new URI(cli.to),
