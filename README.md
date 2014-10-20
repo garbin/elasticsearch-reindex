@@ -10,31 +10,46 @@ Installation
 $ npm install -g elasticsearch-reindex
 ```
 
-Example
+Usage
 -------
 
-Quick start: run the following command to reindex your data:
+### Quick start
+Simply run the following command to reindex your data:
 ```
-$ elasticsearch-reindex -s http://192.168.1.100/old_index/old_type -d http://10.0.0.1/new_index/new_type -b 100
+$ elasticsearch-reindex -f http://192.168.1.100/old_index/old_type -t http://10.0.0.1/new_index/new_type
 ```
 
-Use custom indexer:
+You can omit {new_index} and {new_type} if new index name and type name same as the old
+```
+$ elasticsearch-reindex -f http://192.168.1.100/old_index/old_type -t http://10.0.0.1/new_index/new_type
+```
 
-Create your own indexer.js
+Advanced feature
+----------------
+
+Some times, you may want to reindex the data by your custom indexer script(eg. reindex the data to multiple index based on the date field). The custom indexer feature can help you out on this situation.
+
+To use this feature, create your own indexer.js
 ```js
 var moment = require('moment');
 
 module.exports = {
   index: function(item, options) {
     return [
-      {index:{_index: 'listening_' + moment(item._source.date).format('YYYYMM'), _type:options.type || item._type, _id: item._id}},
+      {index:{_index: 'tweets_' + moment(item._source.date).format('YYYYMM'), _type:options.type || item._type, _id: item._id}},
       item._source
     ];
   }
 };
 ```
 
-Pass the script path to elasticsearch-reindex to reindex your data with it
+Simply pass this script's path, it will work.
 ```
-$ elasticsearch-reindex -s http://192.168.1.100/old_index/old_type -d http://10.0.0.1/ -b 100 ./indexer.js
+$ elasticsearch-reindex -s http://192.168.1.100/old_index/old_type -d http://10.0.0.1/ indexer.js
 ```
+
+Have fun!
+
+## License
+
+Intervention Image is licensed under the [MIT License](http://opensource.org/licenses/MIT).

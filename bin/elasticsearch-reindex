@@ -10,6 +10,7 @@ var cli           = require('commander'),
     URI           = require('URIjs');
 
 var logger        = bunyan.createLogger({
+  src: true,
   name: "elasticsearch-reindex",
   streams: [{
     path: "/var/log/elasticsearch-reindex.log"
@@ -17,66 +18,73 @@ var logger        = bunyan.createLogger({
 });
 
 cli
-.version('1.0.6')
-.option('-s, --src [value]', 'source index, eg. http://192.168.1.100:9200/{src_index}/{src_type}')
-.option('-d, --dest [value]', 'destination index, eg. http://192.168.1.100:9200/{dest_index}/{dest_type}')
+.version('1.0.7')
+.option('-f, --from [value]', 'source index, eg. http://192.168.1.100:9200/old_index/old_type')
+.option('-t, --to [value]', 'to index, eg. http://192.168.1.100:9200/new_index/new_type')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
 .option('-b, --bulk [value]', 'bulk size for a thread', 100)
+.option('-s, --scroll [value]', 'default 1m', '1m')
+.option('-o, --request_timeout [value]', 'default 60000', 60000)
 .parse(process.argv);
 
-var src_uri      = new URI(cli.src),
-    dest_uri     = new URI(cli.dest),
-    src_client   = new elasticsearch.Client({host:src_uri.host()}),
-    dest_client  = new elasticsearch.Client({host:dest_uri.host()}),
-    src_path     = (function() { var tmp = src_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
-    dest_path    = (function() { var tmp = dest_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
-    dest_uri     = new URI(cli.dest),
+var from_uri      = new URI(cli.from),
+    to_uri     = new URI(cli.to),
+    from_client   = new elasticsearch.Client({host:from_uri.host(), requestTimeout:cli.request_timeout}),
+    to_client  = new elasticsearch.Client({host:to_uri.host(), requestTimeout:cli.request_timeout}),
+    from_path     = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
+    to_path    = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
     total        = 0,  processed_total = 0,
     custom_indexer = cli.args[0] ? require(fs.realpathSync(cli.args[0])) : null;
     scan_options = {
-      index       : src_path.index,
-      type        : src_path.type,
+      index       : from_path.index,
+      type        : from_path.type,
       search_type : 'scan',
-      scroll      : '1m',
+      scroll      : cli.scroll,
       size        : cli.bulk
     };
 
 var reindexer = new Indexer(),
     pace          = require('pace')(100);
 
-reindexer.on('error', function(err) {
-  logger.warn(err);
+reindexer.on('warning', function(warning) {
+  logger.warn(warning);
 });
 
-reindexer.on('success', function(num_of_success) {
+reindexer.on('error', function(error) {
+  logger.error(error);
+});
+
+reindexer.on('batch-complete', function(num_of_success) {
   processed_total += num_of_success;
   pace.op(processed_total);
 });
 
-src_client.search(scan_options, function scroll_fetch(err, res) {
+from_client.search(scan_options, function scroll_fetch(err, res) {
   if (err) {
-    return console.log(err);
+    logger.fatal(err);
+    return console.log("Scroll error:" + err);
   }
   pace.total = res.hits.total;
   total += res.hits.hits.length;
   reindexer.index(res.hits.hits, {
     concurrency : cli.concurrency,
     bulk        : cli.bulk,
-    client      : dest_client,
+    client      : to_client,
     indexer     : custom_indexer ? custom_indexer.index : null,
-    index       : dest_path.index,
-    type        : dest_path.type
+    index       : to_path.index,
+    type        : to_path.type
   }, function(err) {
     if (err) {
-      return console.log(err);
+      logger.fatal(err);
+      return console.log("Reindex error: " + err);
     }
     if (res.hits.total !== total) {
-      src_client.scroll({
+      from_client.scroll({
         scrollId : res._scroll_id,
-        scroll : '1m'
+        scroll : cli.scroll
       }, scroll_fetch);
     } else {
-      console.log("\n\nReindex processing finished! Total " + total + " documents have been reindexed");
+      console.log("Total " + total + " documents have been reindexed!");
       process.exit();
     }
   });
