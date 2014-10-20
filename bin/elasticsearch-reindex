@@ -11,7 +11,7 @@ var cli           = require('commander'),
 
 
 cli
-.version('1.0.8')
+.version('1.0.9')
 .option('-f, --from [value]', 'source index, eg. http://192.168.1.100:9200/old_index/old_type')
 .option('-t, --to [value]', 'to index, eg. http://192.168.1.100:9200/new_index/new_type')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
@@ -44,6 +44,10 @@ var from_uri      = new URI(cli.from),
       scroll      : cli.scroll,
       size        : cli.bulk
     };
+
+if (custom_indexer && custom_indexer.query) {
+  scan_options.body = custom_indexer.query;
+}
 
 var reindexer = new Indexer(),
     pace          = require('pace')(100);
