@@ -45,7 +45,7 @@ module.exports = {
 
 Simply pass this script's path, it will work.
 ```
-$ elasticsearch-reindex -s http://192.168.1.100/old_index/old_type -d http://10.0.0.1/ indexer.js
+$ elasticsearch-reindex -f http://192.168.1.100/old_index/old_type -t http://10.0.0.1/ indexer.js
 ```
 
 Have fun!
