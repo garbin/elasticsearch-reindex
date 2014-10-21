@@ -11,7 +11,7 @@ var cli           = require('commander'),
 
 
 cli
-.version('1.0.9')
+.version('1.0.10')
 .option('-f, --from [value]', 'source index, eg. http://192.168.1.100:9200/old_index/old_type')
 .option('-t, --to [value]', 'to index, eg. http://192.168.1.100:9200/new_index/new_type')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
@@ -19,6 +19,7 @@ cli
 .option('-s, --scroll [value]', 'default 1m', '1m')
 .option('-o, --request_timeout [value]', 'default 60000', 60000)
 .option('-l, --log_path [value]', 'default ./reindex.log', './reindex.log')
+.option('-n, --max_docs [value]', 'default -1 unlimited', -1)
 .parse(process.argv);
 
 var logger        = bunyan.createLogger({
@@ -70,7 +71,7 @@ from_client.search(scan_options, function scroll_fetch(err, res) {
     logger.fatal(err);
     return console.log("Scroll error:" + err);
   }
-  pace.total = res.hits.total;
+  pace.total = cli.max_docs == -1 ? res.hits.total : cli.max_docs;
   total += res.hits.hits.length;
   reindexer.index(res.hits.hits, {
     concurrency : cli.concurrency,
@@ -84,7 +85,7 @@ from_client.search(scan_options, function scroll_fetch(err, res) {
       logger.fatal(err);
       return console.log("Reindex error: " + err);
     }
-    if (res.hits.total !== total) {
+    if (pace.total !== total) {
       from_client.scroll({
         scrollId : res._scroll_id,
         scroll : cli.scroll
