@@ -1,7 +1,7 @@
 elasticsearch-reindex
 =====================
 
-A tool for easy reindex your elasticsearch data
+A full feature tool for easy reindex your elasticsearch data
 
 Installation
 -----------
