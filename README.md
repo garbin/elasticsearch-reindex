@@ -49,7 +49,7 @@ Simply pass this script's path, it will work.
 ```
 $ elasticsearch-reindex -f http://192.168.1.100:9200/old_index/old_type -t http://10.0.0.1:9200/ indexer.js
 ```
-### Customer query
+### Custom query
 
 Add custom query in indexer.js
 ```js
