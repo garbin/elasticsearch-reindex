@@ -1,6 +1,13 @@
 var moment = require('moment');
 
 module.exports = {
+  sharded: {
+    field: 'idate',
+    ranges:[
+      [null, '2014-07-15'],
+      ['2014-07-15', '2014-08-01']
+    ]
+  },
   query: { match_all:{} },
   index: function(item, options) {
     return [
