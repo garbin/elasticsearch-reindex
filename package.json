@@ -33,6 +33,7 @@
     "event-emitter": "^0.3.1",
     "moment": "^2.8.3",
     "pace": "0.0.4",
+    "progress": "^1.1.8",
     "underscore": "^1.7.0"
   }
 }
