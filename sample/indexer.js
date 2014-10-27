@@ -4,8 +4,19 @@ module.exports = {
   sharded: {
     field: 'idate',
     ranges:[
-      [null, '2014-07-15'],
-      ['2014-07-15', '2014-08-01']
+      {
+        name: '7_1',
+        range: {
+          lt: '2014-07-15'
+        }
+      },
+      {
+        name: '7_2',
+        range: {
+          gte: '2014-07-15',
+          lt: '2014-08-01'
+        }
+      }
     ]
   },
   query: { match_all:{} },
