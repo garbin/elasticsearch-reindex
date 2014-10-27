@@ -13,7 +13,7 @@ var cli           = require('commander'),
 
 
 cli
-.version('1.1.0')
+.version('1.1.1')
 .option('-f, --from [value]', 'source index, eg. http://192.168.1.100:9200/old_index/old_type')
 .option('-t, --to [value]', 'to index, eg. http://192.168.1.100:9200/new_index/new_type')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
@@ -45,6 +45,12 @@ if (cluster.isMaster) {
   } else {
     cluster.fork();
   }
+  cluster.on('exit', function(worker, code, signal) {
+    console.log('worker ' + worker.process.pid + ' exited(' + code + ') signal ' + signal);
+  });
+  cluster.on('disconnect', function(worker) {
+    console.log('The worker #' + worker.id + ' has disconnected');
+  });
 } else {
   var range = null;
   var shard_name = '';
