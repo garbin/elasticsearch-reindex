@@ -4,6 +4,7 @@ var cli           = require('commander'),
     elasticsearch = require('elasticsearch')
     async         = require('async'),
     cluster       = require('cluster'),
+    moment        = require('moment'),
     _             = require('underscore'),
     bunyan        = require('bunyan'),
     ProgressBar   = require('progress'),
@@ -13,7 +14,7 @@ var cli           = require('commander'),
 
 
 cli
-.version('1.1.1')
+.version('1.1.2')
 .option('-f, --from [value]', 'source index, eg. http://192.168.1.100:9200/old_index/old_type')
 .option('-t, --to [value]', 'to index, eg. http://192.168.1.100:9200/new_index/new_type')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
@@ -37,7 +38,41 @@ var custom_indexer = cli.args[0] ? require(fs.realpathSync(cli.args[0])) : null;
 
 if (cluster.isMaster) {
   if (custom_indexer.sharded) {
-    custom_indexer.sharded.ranges.forEach(function(shard) {
+    var ranges = [];
+    if (custom_indexer.sharded.ranges) {
+      ranges = custom_indexer.sharded.ranges;
+    } else {
+      var now = moment();
+      var start = moment(custom_indexer.sharded.start);
+      var end = custom_indexer.sharded.end ? moment(custom_indexer.sharded.end) : now;
+      var current = start;
+      var interval_days = 1;
+      switch(custom_indexer.sharded.interval) {
+        case 'month':
+          interval_days = 30;
+          break;
+        case 'week':
+          interval_days = 7;
+          break;
+        default:
+          interval_days = parseInt(custom_indexer.sharded.interval);
+      }
+      while(current < end){
+        var current_end = current.clone().add(interval_days, 'days');
+        if (current_end > end) {
+          current_end = end;
+        }
+        ranges.push({
+          name: current.format('YYMMDD') + '-' + current_end.format('YYMMDD'),
+          range: {
+            gte: current.format('YYYY-MM-DD'),
+            lt: current_end.format('YYYY-MM-DD')
+          }
+        });
+        current = current_end;
+      }
+    }
+    ranges.forEach(function(shard) {
       var worker_arg = {range:{}, name: shard.name};
       worker_arg.range[custom_indexer.sharded.field] = shard.range;
       cluster.fork({worker_arg:JSON.stringify(worker_arg)});
@@ -96,6 +131,7 @@ if (cluster.isMaster) {
   });
 
   reindexer.on('batch-complete', function(num_of_success) {
+    console.log("\n");
     bar.tick(num_of_success);
   });
 
@@ -129,7 +165,7 @@ if (cluster.isMaster) {
           scroll : cli.scroll
         }, scroll_fetch);
       } else {
-        console.log("\n    Total " + processed_total + " documents have been reindexed!");
+        console.log("\n    " + shard_name + " Total " + processed_total + " documents have been reindexed!");
         process.exit();
       }
     });
