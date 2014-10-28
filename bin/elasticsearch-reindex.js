@@ -14,7 +14,7 @@ var cli           = require('commander'),
 
 
 cli
-.version('1.1.2')
+.version('1.1.3')
 .option('-f, --from [value]', 'source index, eg. http://192.168.1.100:9200/old_index/old_type')
 .option('-t, --to [value]', 'to index, eg. http://192.168.1.100:9200/new_index/new_type')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
@@ -81,10 +81,15 @@ if (cluster.isMaster) {
     cluster.fork();
   }
   cluster.on('exit', function(worker, code, signal) {
-    console.log('worker ' + worker.process.pid + ' exited(' + code + ') signal ' + signal);
-  });
-  cluster.on('disconnect', function(worker) {
-    console.log('The worker #' + worker.id + ' has disconnected');
+    if( signal ) {
+      logger.fatal("worker was killed by signal: "+signal);
+      console.log("worker was killed by signal: "+signal);
+    } else if( code !== 0 ) {
+      logger.fatal("worker exited with error code: "+code);
+      console.log("worker exited with error code: "+code);
+    } else {
+      console.log('    Worker finished his work!');
+    }
   });
 } else {
   var range = null;
