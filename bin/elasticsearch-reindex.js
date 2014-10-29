@@ -14,7 +14,7 @@ var cli           = require('commander'),
 
 
 cli
-.version('1.1.4')
+.version('1.1.5')
 .option('-f, --from [value]', 'source index, eg. http://192.168.1.100:9200/old_index/old_type')
 .option('-t, --to [value]', 'to index, eg. http://192.168.1.100:9200/new_index/new_type')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
