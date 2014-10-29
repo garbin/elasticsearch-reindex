@@ -14,7 +14,7 @@ var cli           = require('commander'),
 
 
 cli
-.version('1.1.3')
+.version('1.1.4')
 .option('-f, --from [value]', 'source index, eg. http://192.168.1.100:9200/old_index/old_type')
 .option('-t, --to [value]', 'to index, eg. http://192.168.1.100:9200/new_index/new_type')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
@@ -106,7 +106,8 @@ if (cluster.isMaster) {
       to_client  = new elasticsearch.Client({host:to_uri.host(), requestTimeout:cli.request_timeout}),
       from_path     = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
       to_path    = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
-      processed_total        = 0;
+      processed_total        = 0,
+      processed_failed       = 0;
   var scan_options = {
         index       : from_path.index,
         type        : from_path.type,
@@ -127,8 +128,9 @@ if (cluster.isMaster) {
   var reindexer = new Indexer();
   var bar = new ProgressBar("    " + shard_name + " reindexing [:bar] :current/:total(:percent) :elapsed :etas", {total:100, width:30});;
 
-  reindexer.on('warning', function(warning) {
-    logger.warn(warning);
+  reindexer.on('item-failed', function(item) {
+    processed_failed++;
+    logger.warn(item);
   });
 
   reindexer.on('error', function(error) {
@@ -170,7 +172,12 @@ if (cluster.isMaster) {
           scroll : cli.scroll
         }, scroll_fetch);
       } else {
-        console.log("\n    " + shard_name + " Total " + processed_total + " documents have been reindexed!");
+        var msg = "    " + shard_name + " Total " + processed_total + " documents have been processed!"
+        if (processed_failed) {
+          msg +=   " about " + processed_failed + " documents reindex failed, see the " + cli.log_path;
+        }
+        console.log("\n" + msg);
+        logger.info(msg);
         process.exit();
       }
     });
