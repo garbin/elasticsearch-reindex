@@ -22,6 +22,7 @@ cli
 .option('-s, --scroll [value]', 'default 1m', '1m')
 .option('-o, --request_timeout [value]', 'default 60000', 60000)
 .option('-l, --log_path [value]', 'default ./reindex.log', './reindex.log')
+.option('-r, --trace', 'default false', false)
 .option('-n, --max_docs [value]', 'default -1 unlimited', -1)
 .parse(process.argv);
 
@@ -100,6 +101,7 @@ if (cluster.isMaster) {
     range = worker_arg.range;
     shard_name = worker_arg.name;
   }
+
   var from_uri      = new URI(cli.from),
       to_uri     = new URI(cli.to),
       from_client   = new elasticsearch.Client({host:from_uri.host(), requestTimeout:cli.request_timeout}),
@@ -147,7 +149,12 @@ if (cluster.isMaster) {
       logger.fatal(err);
       return console.log("Scroll error:" + err);
     }
-    bar.total = cli.max_docs == -1 ? res.hits.total : cli.max_docs;
+    if (!res.hits.total) {
+      logger.info('No documents can be found!');
+      console.log('No documents can be found!');
+      return process.exit();
+    }
+    bar.total = cli.max_docs == -1 ? res.hits.total : (cli.max_docs > res.hits.total ? res.hits.total : cli.max_docs);
     var docs = res.hits.hits;
     processed_total = processed_total + docs.length;
     if (processed_total > bar.total) {
