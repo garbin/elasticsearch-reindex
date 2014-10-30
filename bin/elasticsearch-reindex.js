@@ -14,11 +14,12 @@ var cli           = require('commander'),
 
 
 cli
-.version('1.1.5')
+.version('1.1.6')
 .option('-f, --from [value]', 'source index, eg. http://192.168.1.100:9200/old_index/old_type')
 .option('-t, --to [value]', 'to index, eg. http://192.168.1.100:9200/new_index/new_type')
 .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
 .option('-b, --bulk [value]', 'bulk size for a thread', 100)
+.option('-q, --query_size [value]', 'query size for scroll', 100)
 .option('-s, --scroll [value]', 'default 1m', '1m')
 .option('-o, --request_timeout [value]', 'default 60000', 60000)
 .option('-l, --log_path [value]', 'default ./reindex.log', './reindex.log')
@@ -38,7 +39,7 @@ var logger        = bunyan.createLogger({
 var custom_indexer = cli.args[0] ? require(fs.realpathSync(cli.args[0])) : null;
 
 if (cluster.isMaster) {
-  if (custom_indexer.sharded) {
+  if (custom_indexer && custom_indexer.sharded) {
     var ranges = [];
     if (custom_indexer.sharded.ranges) {
       ranges = custom_indexer.sharded.ranges;
@@ -115,7 +116,7 @@ if (cluster.isMaster) {
         type        : from_path.type,
         search_type : 'scan',
         scroll      : cli.scroll,
-        size        : cli.bulk,
+        size        : cli.query_size,
         body        : {}
       };
 
