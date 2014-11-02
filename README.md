@@ -79,6 +79,37 @@ $ elasticsearch-reindex -f http://192.168.1.100:9200/old_index/old_type -t http:
 
 Only the user Garbin's data will be indexed
 
+### Index parallelly
+
+Will take a very very long time to reindex a very big index, you may want to make it small, and reindex it parallelly. Now you can do this with the "Shard" feature.
+
+```js
+var moment = require('moment');
+
+module.exports = {
+  sharded:{
+    field: "created_at",
+    start: "2014-01-01",
+    end:   "2014-12-31",
+    interval: 'month' // day, week, or a number of day, such as 7 for 7 days.
+  },
+  index: function(item, options) {
+    return [
+      {index:{_index: 'tweets_' + moment(item._source.date).format('YYYYMM'), _type:options.type || item._type, _id: item._id}},
+      item._source
+    ];
+  }
+};
+```
+
+The sharded config will make the big index into 12 shards based on created_at field and reindex it parallelly.
+
+Then
+```
+$ elasticsearch-reindex -f http://192.168.1.100:9200/old_index/old_type -t http://10.0.0.1:9200/ indexer.js
+```
+
+You will see the reindex progress for every shard clearly
 
 Have fun!
 
