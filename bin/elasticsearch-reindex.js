@@ -25,6 +25,7 @@ cli
 .option('-l, --log_path [value]', 'default ./reindex.log', './reindex.log')
 .option('-r, --trace', 'default false', false)
 .option('-n, --max_docs [value]', 'default -1 unlimited', -1)
+.option('-v, --api_ver [value]', 'default 1.5', '1.5')
 .parse(process.argv);
 
 var logger        = bunyan.createLogger({
@@ -176,7 +177,7 @@ if (cluster.isMaster) {
       }
       if (processed_total < bar.total) {
         from_client.scroll({
-          scrollId : res._scroll_id,
+          body : res._scroll_id,
           scroll : cli.scroll
         }, scroll_fetch);
       } else {
