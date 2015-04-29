@@ -25,6 +25,7 @@ cli
 .option('-l, --log_path [value]', 'default ./reindex.log', './reindex.log')
 .option('-r, --trace', 'default false', false)
 .option('-n, --max_docs [value]', 'default -1 unlimited', -1)
+.option('-v, --api_ver [value]', 'default 1.5', '1.5')
 .parse(process.argv);
 
 var logger        = bunyan.createLogger({
@@ -105,8 +106,8 @@ if (cluster.isMaster) {
 
   var from_uri      = new URI(cli.from),
       to_uri     = new URI(cli.to),
-      from_client   = new elasticsearch.Client({host:from_uri.host(), requestTimeout:cli.request_timeout}),
-      to_client  = new elasticsearch.Client({host:to_uri.host(), requestTimeout:cli.request_timeout}),
+      from_client   = new elasticsearch.Client({host:from_uri.host(), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
+      to_client  = new elasticsearch.Client({host:to_uri.host(), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
       from_path     = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
       to_path    = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
       processed_total        = 0,
@@ -176,7 +177,7 @@ if (cluster.isMaster) {
       }
       if (processed_total < bar.total) {
         from_client.scroll({
-          scrollId : res._scroll_id,
+          body : res._scroll_id,
           scroll : cli.scroll
         }, scroll_fetch);
       } else {
