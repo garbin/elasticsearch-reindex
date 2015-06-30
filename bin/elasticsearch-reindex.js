@@ -26,6 +26,7 @@ cli
 .option('-r, --trace', 'default false', false)
 .option('-n, --max_docs [value]', 'default -1 unlimited', -1)
 .option('-v, --api_ver [value]', 'default 1.5', '1.5')
+.option('-p, --parent [value]', 'if set, uses this field as parent field', '')
 .parse(process.argv);
 
 var logger        = bunyan.createLogger({
