@@ -170,7 +170,8 @@ if (cluster.isMaster) {
       client      : to_client,
       indexer     : custom_indexer ? custom_indexer.index : null,
       index       : to_path.index,
-      type        : to_path.type
+      type        : to_path.type,
+      parent      : cli.parent
     }, function(err) {
       if (err) {
         logger.fatal(err);
