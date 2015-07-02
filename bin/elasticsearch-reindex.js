@@ -26,6 +26,7 @@ cli
 .option('-r, --trace', 'default false', false)
 .option('-n, --max_docs [value]', 'default -1 unlimited', -1)
 .option('-v, --api_ver [value]', 'default 1.5', '1.5')
+.option('-p, --parent [value]', 'if set, uses this field as parent field', '')
 .parse(process.argv);
 
 var logger        = bunyan.createLogger({
@@ -169,7 +170,8 @@ if (cluster.isMaster) {
       client      : to_client,
       indexer     : custom_indexer ? custom_indexer.index : null,
       index       : to_path.index,
-      type        : to_path.type
+      type        : to_path.type,
+      parent      : cli.parent
     }, function(err) {
       if (err) {
         logger.fatal(err);
