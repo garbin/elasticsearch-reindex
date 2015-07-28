@@ -106,15 +106,14 @@ if (cluster.isMaster) {
     shard_name = worker_arg.name;
   }
 
-  var from_uri    = new URI(cli.from),
-      to_uri   = new URI(cli.to),
+  var from_uri      = new URI(cli.from),
+      to_uri     = new URI(cli.to),
       from_client   = new elasticsearch.Client({host:from_uri.host(), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
       to_client  = new elasticsearch.Client({host:to_uri.host(), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
-      from_path   = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
-      to_path  = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
-      processed_total    = 0,
-      processed_failed     = 0;
-
+      from_path     = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
+      to_path    = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
+      processed_total        = 0,
+      processed_failed       = 0;
   var scan_options = {
         index       : from_path.index,
         type        : from_path.type,
@@ -122,7 +121,7 @@ if (cluster.isMaster) {
         scroll      : cli.scroll,
         size        : cli.query_size,
         body        : {}
-  };
+      };
 
   if (range) {
     _.defaults(scan_options.body, {query:{range:range}});
