@@ -1,36 +1,36 @@
 #!/usr/bin/env node
 
-var cli             = require('commander'),
-    elasticsearch   = require('elasticsearch')
-    async           = require('async'),
-    cluster         = require('cluster'),
-    moment          = require('moment'),
-    _               = require('underscore'),
-    bunyan          = require('bunyan'),
-    ProgressBar     = require('progress'),
-    fs              = require('fs'),
-    Indexer         = require('../lib/indexer'),
-    URI             = require('URIjs');
+var cli           = require('commander'),
+    elasticsearch = require('elasticsearch')
+    async         = require('async'),
+    cluster       = require('cluster'),
+    moment        = require('moment'),
+    _             = require('underscore'),
+    bunyan        = require('bunyan'),
+    ProgressBar   = require('progress'),
+    fs            = require('fs'),
+    Indexer       = require('../lib/indexer'),
+    URI           = require('URIjs');
 
 
 cli
-  .version('1.1.6')
-  .option('-f, --from [value]', 'source index, eg. http://192.168.1.100:9200/old_index/old_type')
-  .option('-t, --to [value]', 'to index, eg. http://192.168.1.100:9200/new_index/new_type')
-  .option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
-  .option('-b, --bulk [value]', 'bulk size for a thread', 100)
-  .option('-q, --query_size [value]', 'query size for scroll', 100)
-  .option('-s, --scroll [value]', 'default 1m', '1m')
-  .option('-o, --request_timeout [value]', 'default 60000', 60000)
-  .option('-l, --log_path [value]', 'default ./reindex.log', './reindex.log')
-  .option('-r, --trace', 'default false', false)
-  .option('-n, --max_docs [value]', 'default -1 unlimited', -1)
-  .option('-v, --api_ver [value]', 'default 1.5', '1.5')
-  .option('-p, --parent [value]', 'if set, uses this field as parent field', '')
-  .option('-m, --promise [value]', 'if set indexes expecting promises, default: false', false)
-  .parse(process.argv);
+.version('1.1.6')
+.option('-f, --from [value]', 'source index, eg. http://192.168.1.100:9200/old_index/old_type')
+.option('-t, --to [value]', 'to index, eg. http://192.168.1.100:9200/new_index/new_type')
+.option('-c, --concurrency [value]', 'concurrency for reindex', require('os').cpus().length)
+.option('-b, --bulk [value]', 'bulk size for a thread', 100)
+.option('-q, --query_size [value]', 'query size for scroll', 100)
+.option('-s, --scroll [value]', 'default 1m', '1m')
+.option('-o, --request_timeout [value]', 'default 60000', 60000)
+.option('-l, --log_path [value]', 'default ./reindex.log', './reindex.log')
+.option('-r, --trace', 'default false', false)
+.option('-n, --max_docs [value]', 'default -1 unlimited', -1)
+.option('-v, --api_ver [value]', 'default 1.5', '1.5')
+.option('-p, --parent [value]', 'if set, uses this field as parent field', '')
+.option('-m, --promise [value]', 'if set indexes expecting promises, default: false', false)
+.parse(process.argv);
 
-var logger    = bunyan.createLogger({
+var logger        = bunyan.createLogger({
   src: true,
   name: "elasticsearch-reindex",
   streams: [{
@@ -93,7 +93,7 @@ if (cluster.isMaster) {
       logger.fatal("worker exited with error code: "+code);
       console.log("worker exited with error code: "+code);
     } else {
-      console.log('  Worker finished his work!');
+      console.log('    Worker finished his work!');
     }
   });
 } else {
@@ -107,21 +107,21 @@ if (cluster.isMaster) {
   }
 
   var from_uri    = new URI(cli.from),
-    to_uri   = new URI(cli.to),
-    from_client   = new elasticsearch.Client({host:from_uri.host(), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
-    to_client  = new elasticsearch.Client({host:to_uri.host(), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
-    from_path   = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
-    to_path  = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
-    processed_total    = 0,
-    processed_failed     = 0;
+      to_uri   = new URI(cli.to),
+      from_client   = new elasticsearch.Client({host:from_uri.host(), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
+      to_client  = new elasticsearch.Client({host:to_uri.host(), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
+      from_path   = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
+      to_path  = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
+      processed_total    = 0,
+      processed_failed     = 0;
 
   var scan_options = {
-    index     : from_path.index,
-    type    : from_path.type,
-    search_type : 'scan',
-    scroll    : cli.scroll,
-    size    : cli.query_size,
-    body    : {}
+        index       : from_path.index,
+        type        : from_path.type,
+        search_type : 'scan',
+        scroll      : cli.scroll,
+        size        : cli.query_size,
+        body        : {}
   };
 
   if (range) {
@@ -133,7 +133,7 @@ if (cluster.isMaster) {
   }
 
   var reindexer = new Indexer();
-  var bar = new ProgressBar("  " + shard_name + " reindexing [:bar] :current/:total(:percent) :elapsed :etas", {total:100, width:30});;
+  var bar = new ProgressBar("    " + shard_name + " reindexing [:bar] :current/:total(:percent) :elapsed :etas", {total:100, width:30});;
 
   reindexer.on('item-failed', function(item) {
     processed_failed++;
@@ -170,12 +170,12 @@ if (cluster.isMaster) {
     }
     reindexer[reindexMethod](docs, {
       concurrency : cli.concurrency,
-      bulk    : cli.bulk,
-      client    : to_client,
-      indexer   : custom_indexer ? custom_indexer.index : null,
-      index     : to_path.index,
-      type    : to_path.type,
-      parent    : cli.parent
+      bulk        : cli.bulk,
+      client      : to_client,
+      indexer     : custom_indexer ? custom_indexer.index : null,
+      index       : to_path.index,
+      type        : to_path.type,
+      parent      : cli.parent
     }, function(err) {
       if (err) {
         logger.fatal(err);
@@ -187,7 +187,7 @@ if (cluster.isMaster) {
           scroll : cli.scroll
         }, scroll_fetch);
       } else {
-        var msg = "  " + shard_name + " Total " + processed_total + " documents have been processed!"
+        var msg = "    " + shard_name + " Total " + processed_total + " documents have been processed!"
         if (processed_failed) {
           msg +=   " about " + processed_failed + " documents reindex failed, see the " + cli.log_path;
         }
