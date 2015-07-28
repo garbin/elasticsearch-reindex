@@ -1,7 +1,7 @@
 {
   "name": "elasticsearch-reindex",
   "version": "1.1.6",
-  "description": "Elasticsearch reindex tool",
+  "description": "Elasticsearch reindex tool - with promises!",
   "main": "index.js",
   "scripts": {
     "test": "npm test"
@@ -18,7 +18,10 @@
     "reindex",
     "tool"
   ],
-  "author": "Garbin Huang <garbinh@gmail.com>",
+  "authors": [
+    "Garbin Huang <garbinh@gmail.com>",
+    "Marius Miliunas <mvmiliunas@gmail.com>"
+  ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/garbin/elasticsearch-reindex/issues"
@@ -34,6 +37,7 @@
     "moment": "^2.8.3",
     "pace": "0.0.4",
     "progress": "^1.1.8",
+    "q": "^1.4.1",
     "underscore": "^1.7.0"
   }
 }
