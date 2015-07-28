@@ -149,12 +149,6 @@ if (cluster.isMaster) {
     bar.tick(num_of_success);
   });
 
-  if (cli.promise && !custom_indexer) {
-    logger.fatal('custom indexer is required for promise base reindexing.');
-    console.log('custom indexer is required for promise base reindexing.');
-    return process.exit();
-  }
-
   from_client.search(scan_options, function scroll_fetch(err, res) {
     if (err) {
       logger.fatal(err);
