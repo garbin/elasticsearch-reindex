@@ -109,6 +109,47 @@ Then
 $ elasticsearch-reindex -f http://192.168.1.100:9200/old_index/old_type -t http://10.0.0.1:9200/ indexer.js
 ```
 
+### Index with promises
+
+Added support for promises so that you can request data from other parts of the database
+
+```js
+module.exports = {
+  index: function (item, opts, client) {
+    var indexData = {
+          index: {
+            _index: opts.index,
+            _type: item._type,
+            _id: item._id
+          }
+        };
+    
+    // With the client we can access other parts of our database
+    return client.mget({
+      index: 'media',
+      type: 'movies',
+      body: {
+        ids: item._source.favoriteMovieIDs
+      }
+    }).then(function (response) {
+      item._source.faveMovies = response.docs.map(function (movie) {
+        return {
+          name: movie._source.name,
+          id: movie._source.id
+        };      
+      });
+      
+      return [indexData, item._source];
+    });
+  }
+}
+```
+
+Then
+```
+$ elasticsearch-reindex -f http://192.168.1.100:9200/old_index/old_type -t http://10.0.0.1:9200/ -m true indexer.js
+```
+
 You will see the reindex progress for every shard clearly
 
 Have fun!

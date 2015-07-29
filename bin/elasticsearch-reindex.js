@@ -27,6 +27,7 @@ cli
 .option('-n, --max_docs [value]', 'default -1 unlimited', -1)
 .option('-v, --api_ver [value]', 'default 1.5', '1.5')
 .option('-p, --parent [value]', 'if set, uses this field as parent field', '')
+.option('-m, --promise [value]', 'if set indexes expecting promises, default: false', false)
 .parse(process.argv);
 
 var logger        = bunyan.createLogger({
@@ -98,7 +99,7 @@ if (cluster.isMaster) {
 } else {
   var range = null;
   var shard_name = '';
-  if (true) {}
+
   if (process.env['worker_arg']) {
     worker_arg = JSON.parse(process.env['worker_arg']);
     range = worker_arg.range;
@@ -158,13 +159,15 @@ if (cluster.isMaster) {
       return process.exit();
     }
     bar.total = cli.max_docs == -1 ? res.hits.total : (cli.max_docs > res.hits.total ? res.hits.total : cli.max_docs);
-    var docs = res.hits.hits;
+    var docs = res.hits.hits,
+      reindexMethod = cli.promise ? 'indexPromise' : 'index';
+
     processed_total = processed_total + docs.length;
     if (processed_total > bar.total) {
       docs = docs.slice(0, bar.total - processed_total);
       processed_total = bar.total;
     }
-    reindexer.index(docs, {
+    reindexer[reindexMethod](docs, {
       concurrency : cli.concurrency,
       bulk        : cli.bulk,
       client      : to_client,
