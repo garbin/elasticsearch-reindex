@@ -93,7 +93,7 @@ if (cluster.isMaster) {
       logger.fatal("worker exited with error code: "+code);
       console.log("worker exited with error code: "+code);
     } else {
-      console.log('    Worker finished his work!');
+      console.log('    Worker finished its work!');
     }
   });
 } else {
