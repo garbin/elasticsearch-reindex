@@ -10,6 +10,7 @@ var cli           = require('commander'),
     ProgressBar   = require('progress'),
     fs            = require('fs'),
     Indexer       = require('../lib/indexer'),
+    escapeRegExp  = require('../lib/escape-regexp'),
     URI           = require('URIjs');
 
 
@@ -37,7 +38,6 @@ var logger        = bunyan.createLogger({
     path: cli.log_path
   }]
 });
-
 
 var custom_indexer = cli.args[0] ? require(fs.realpathSync(cli.args[0])) : null;
 
@@ -108,8 +108,8 @@ if (cluster.isMaster) {
 
   var from_uri      = new URI(cli.from),
       to_uri        = new URI(cli.to),
-      from_client   = new elasticsearch.Client({host:cli.from.replace(from_uri.path(), ''), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
-      to_client     = new elasticsearch.Client({host:cli.to.replace(to_uri.path(), ''), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
+      from_client   = new elasticsearch.Client({ host: cli.from.replace(new RegExp(escapeRegExp(from_uri.path()) + '.*'), ''), requestTimeout: cli.request_timeout, apiVersion: cli.api_ver }),
+      to_client     = new elasticsearch.Client({ host: cli.to.replace(new RegExp(escapeRegExp(to_uri.path()) + '.*'), ''), requestTimeout: cli.request_timeout, apiVersion: cli.api_ver }),
       from_path     = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}; })(),
       to_path       = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}; })(),
       processed_total        = 0,
