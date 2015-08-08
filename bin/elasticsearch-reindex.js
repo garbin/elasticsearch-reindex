@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var cli           = require('commander'),
-    elasticsearch = require('elasticsearch')
+    elasticsearch = require('elasticsearch'),
     async         = require('async'),
     cluster       = require('cluster'),
     moment        = require('moment'),
@@ -10,6 +10,7 @@ var cli           = require('commander'),
     ProgressBar   = require('progress'),
     fs            = require('fs'),
     Indexer       = require('../lib/indexer'),
+    escapeRegExp  = require('../lib/escape-regexp'),
     URI           = require('URIjs');
 
 
@@ -37,7 +38,6 @@ var logger        = bunyan.createLogger({
     path: cli.log_path
   }]
 });
-
 
 var custom_indexer = cli.args[0] ? require(fs.realpathSync(cli.args[0])) : null;
 
@@ -93,25 +93,25 @@ if (cluster.isMaster) {
       logger.fatal("worker exited with error code: "+code);
       console.log("worker exited with error code: "+code);
     } else {
-      console.log('    Worker finished his work!');
+      console.log('    Worker finished its work!');
     }
   });
 } else {
   var range = null;
   var shard_name = '';
 
-  if (process.env['worker_arg']) {
-    worker_arg = JSON.parse(process.env['worker_arg']);
+  if (process.env.worker_arg) {
+    worker_arg = JSON.parse(process.env.worker_arg);
     range = worker_arg.range;
     shard_name = worker_arg.name;
   }
 
   var from_uri      = new URI(cli.from),
-      to_uri     = new URI(cli.to),
-      from_client   = new elasticsearch.Client({host:from_uri.host(), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
-      to_client  = new elasticsearch.Client({host:to_uri.host(), requestTimeout:cli.request_timeout, apiVersion: cli.api_ver }),
-      from_path     = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
-      to_path    = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}})(),
+      to_uri        = new URI(cli.to),
+      from_client   = new elasticsearch.Client({ host: cli.from.replace(new RegExp(escapeRegExp(from_uri.path()) + '.*'), ''), requestTimeout: cli.request_timeout, apiVersion: cli.api_ver }),
+      to_client     = new elasticsearch.Client({ host: cli.to.replace(new RegExp(escapeRegExp(to_uri.path()) + '.*'), ''), requestTimeout: cli.request_timeout, apiVersion: cli.api_ver }),
+      from_path     = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}; })(),
+      to_path       = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}; })(),
       processed_total        = 0,
       processed_failed       = 0;
   var scan_options = {
@@ -132,7 +132,7 @@ if (cluster.isMaster) {
   }
 
   var reindexer = new Indexer();
-  var bar = new ProgressBar("    " + shard_name + " reindexing [:bar] :current/:total(:percent) :elapsed :etas", {total:100, width:30});;
+  var bar = new ProgressBar("    " + shard_name + " reindexing [:bar] :current/:total(:percent) :elapsed :etas", {total:100, width:30});
 
   reindexer.on('item-failed', function(item) {
     processed_failed++;
@@ -186,7 +186,7 @@ if (cluster.isMaster) {
           scroll : cli.scroll
         }, scroll_fetch);
       } else {
-        var msg = "    " + shard_name + " Total " + processed_total + " documents have been processed!"
+        var msg = "    " + shard_name + " Total " + processed_total + " documents have been processed!";
         if (processed_failed) {
           msg +=   " about " + processed_failed + " documents reindex failed, see the " + cli.log_path;
         }
