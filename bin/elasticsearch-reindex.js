@@ -2,7 +2,6 @@
 
 var cli           = require('commander'),
     elasticsearch = require('elasticsearch'),
-    async         = require('async'),
     cluster       = require('cluster'),
     moment        = require('moment'),
     _             = require('underscore'),
@@ -97,6 +96,7 @@ if (cluster.isMaster) {
     }
   });
 } else {
+  var worker_arg = null;
   var range = null;
   var shard_name = '';
 
@@ -108,8 +108,21 @@ if (cluster.isMaster) {
 
   var from_uri      = new URI(cli.from),
       to_uri        = new URI(cli.to),
-      from_client   = new elasticsearch.Client({ host: cli.from.replace(new RegExp(escapeRegExp(from_uri.path()) + '.*'), ''), requestTimeout: cli.request_timeout, apiVersion: cli.api_ver }),
-      to_client     = new elasticsearch.Client({ host: cli.to.replace(new RegExp(escapeRegExp(to_uri.path()) + '.*'), ''), requestTimeout: cli.request_timeout, apiVersion: cli.api_ver }),
+      from_host     = cli.from.replace(new RegExp(escapeRegExp(from_uri.path()) + '.*'), ''),
+      to_host       = cli.to.replace(new RegExp(escapeRegExp(to_uri.path()) + '.*'), '');
+
+  // If no path was supplied, URIjs will always return '/' from `MyURI.path()`
+  // We should strip the trailing slash if present and provide the rest of
+  // the host string to the client.
+  if (from_uri.path() === '/') {
+    from_host = cli.from.replace(/\/$/, '');
+  }
+  if (to_uri.path() === '/') {
+    to_host = cli.to.replace(/\/$/, '');
+  }
+
+  var from_client   = new elasticsearch.Client({ host: from_host, requestTimeout: cli.request_timeout, apiVersion: cli.api_ver }),
+      to_client     = new elasticsearch.Client({ host: to_host, requestTimeout: cli.request_timeout, apiVersion: cli.api_ver }),
       from_path     = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}; })(),
       to_path       = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}; })(),
       processed_total        = 0,
@@ -158,7 +171,7 @@ if (cluster.isMaster) {
       console.log('No documents can be found!');
       return process.exit();
     }
-    bar.total = cli.max_docs == -1 ? res.hits.total : (cli.max_docs > res.hits.total ? res.hits.total : cli.max_docs);
+    bar.total = cli.max_docs === -1 ? res.hits.total : (cli.max_docs > res.hits.total ? res.hits.total : cli.max_docs);
     var docs = res.hits.hits,
       reindexMethod = cli.promise ? 'indexPromise' : 'index';
 
