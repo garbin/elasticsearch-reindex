@@ -28,6 +28,7 @@ cli
 .option('-v, --api_ver [value]', 'default 1.5', '1.5')
 .option('-p, --parent [value]', 'if set, uses this field as parent field', '')
 .option('-m, --promise [value]', 'if set indexes expecting promises, default: false', false)
+.option('-z, --compress [value]', 'if set, requests compression of data in transit', false)
 .parse(process.argv);
 
 var logger        = bunyan.createLogger({
@@ -121,8 +122,8 @@ if (cluster.isMaster) {
     to_host = cli.to.replace(/\/$/, '');
   }
 
-  var from_client   = new elasticsearch.Client({ host: from_host, requestTimeout: cli.request_timeout, apiVersion: cli.api_ver }),
-      to_client     = new elasticsearch.Client({ host: to_host, requestTimeout: cli.request_timeout, apiVersion: cli.api_ver }),
+  var from_client   = new elasticsearch.Client({ host: from_host, requestTimeout: cli.request_timeout, apiVersion: cli.api_ver, suggestCompression: cli.compress }),
+      to_client     = new elasticsearch.Client({ host: to_host, requestTimeout: cli.request_timeout, apiVersion: cli.api_ver, suggestCompression: cli.compress }),
       from_path     = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}; })(),
       to_path       = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}; })(),
       processed_total        = 0,
