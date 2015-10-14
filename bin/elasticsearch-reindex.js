@@ -29,7 +29,7 @@ cli
 .option('-z, --compress [value]', 'if set, requests compression of data in transit', false)
 .parse(process.argv);
 
-var logger        = bunyan.createLogger({
+var logger = bunyan.createLogger({
   src: true,
   name: "elasticsearch-reindex",
   streams: [{
@@ -38,6 +38,7 @@ var logger        = bunyan.createLogger({
 });
 
 var custom_indexer = cli.args[0] ? require(fs.realpathSync(cli.args[0])) : null;
+
 if (cluster.isMaster) {
   var workers = [];
   if (custom_indexer && custom_indexer.sharded) {
@@ -46,14 +47,14 @@ if (cluster.isMaster) {
       ranges = custom_indexer.sharded.ranges;
     } else {
       var now = moment();
-			if (!custom_indexer.sharded.start) {
-				throw new Error("Start time has to be defined in sharded indexer.")
-			}
-			var start = moment(custom_indexer.sharded.start);
+      if (!custom_indexer.sharded.start) {
+        throw new Error("Start time has to be defined in sharded indexer.")
+      }
+      var start = moment(custom_indexer.sharded.start);
       var end = custom_indexer.sharded.end ? moment(custom_indexer.sharded.end) : now;
-			if (!start) {
-				throw new Error("Start of the range has to be specified for sharded indexer.");
-			}
+      if (!start) {
+        throw new Error("Start of the range has to be specified for sharded indexer.");
+      }
       var current = start;
       var interval_days = 1;
       if (custom_indexer.sharded.interval) {
@@ -66,8 +67,8 @@ if (cluster.isMaster) {
             break;
           default: {
             var days = parseInt(custom_indexer.sharded.interval);
-  					if (days) interval_days = days;
-  				}
+            if (days) interval_days = days;
+          }
         }
       } else {
         interval_days = Math.ceil(end.diff(start, 'days') / cli.concurrency);
@@ -87,15 +88,13 @@ if (cluster.isMaster) {
         current = current_end;
       } while (current < end);
     }
-    var bar = new ProgressBar(" reindexing [:bar] :current/:total(:percent) :elapsed :etas", {total:0, width:30});
-    var docs = {};
     ranges.forEach(function(shard) {
       var worker_arg = {range:{}, name: shard.name};
       worker_arg.range[custom_indexer.sharded.field] = shard.range;
       workers.push(worker_arg);
     });
   } else {
-		workers.push({name: "single"})
+    workers.push({name: "single"})
   }
 
   console.log("Starting reindex in " + workers.length + " shards.")
@@ -145,31 +144,31 @@ if (cluster.isMaster) {
     shard_name = cluster.worker.id;
   }
 
-	function createClient(uri) {
-		var uri = uri.lastIndexOf('/') === uri.length -1 ? uri.substr(0, uri.length -1) : uri;
-		tokens = uri.split('/');
-		var res = {};
-		if (tokens.length >= 4) {
-			res.type = tokens.pop();
-			res.index = tokens.pop();
-		}
-		res.host = tokens.join('/');
-		res.client = new elasticsearch.Client({
-			host: res.host,
-			requestTimeout: cli.request_timeout,
-			apiVersion: cli.api_ver,
-			suggestCompression: cli.compress
-		});
-		return res;
-	}
+  function createClient(uri) {
+    var uri = uri.lastIndexOf('/') === uri.length -1 ? uri.substr(0, uri.length -1) : uri;
+    tokens = uri.split('/');
+    var res = {};
+    if (tokens.length >= 4) {
+      res.type = tokens.pop();
+      res.index = tokens.pop();
+    }
+    res.host = tokens.join('/');
+    res.client = new elasticsearch.Client({
+      host: res.host,
+      requestTimeout: cli.request_timeout,
+      apiVersion: cli.api_ver,
+      suggestCompression: cli.compress
+    });
+    return res;
+  }
 
-	if (!cli.from || !cli.to) {
-		throw new Error('"from" and "to" parameters are required');
-	}
+  if (!cli.from || !cli.to) {
+    throw new Error('"from" and "to" parameters are required');
+  }
 
   var from = createClient(cli.from);
       to = createClient(cli.to),
-			processed_total = 0,
+      processed_total = 0,
       processed_failed = 0;
 
   var scan_options = {
@@ -207,11 +206,11 @@ if (cluster.isMaster) {
   from.client.search(scan_options, function scroll_fetch(err, res) {
     if (err) {
       logger.fatal(err);
-			if (err.message.indexOf('parse') > -1) {
-      	throw new Error("Scroll body parsing error, query_size param is possiblly too high.");
-			} else {
-      	throw new Error("Scroll error: " + err);
-			}
+      if (err.message.indexOf('parse') > -1) {
+        throw new Error("Scroll body parsing error, query_size param is possiblly too high.");
+      } else {
+        throw new Error("Scroll error: " + err);
+      }
     }
     if (!res.hits.total) {
       logger.info('No documents can be found!');
