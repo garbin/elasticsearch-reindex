@@ -25,7 +25,6 @@
   },
   "homepage": "https://github.com/garbin/elasticsearch-reindex",
   "dependencies": {
-    "URIjs": "^1.14.1",
     "async": "^0.9.0",
     "bunyan": "^1.2.0",
     "commander": "^2.4.0",

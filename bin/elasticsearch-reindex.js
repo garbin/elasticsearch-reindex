@@ -8,9 +8,7 @@ var cli           = require('commander'),
     bunyan        = require('bunyan'),
     ProgressBar   = require('progress'),
     fs            = require('fs'),
-    Indexer       = require('../lib/indexer'),
-    escapeRegExp  = require('../lib/escape-regexp'),
-    URI           = require('URIjs');
+    Indexer       = require('../lib/indexer');
 
 
 cli
@@ -31,7 +29,7 @@ cli
 .option('-z, --compress [value]', 'if set, requests compression of data in transit', false)
 .parse(process.argv);
 
-var logger        = bunyan.createLogger({
+var logger = bunyan.createLogger({
   src: true,
   name: "elasticsearch-reindex",
   streams: [{
@@ -42,27 +40,40 @@ var logger        = bunyan.createLogger({
 var custom_indexer = cli.args[0] ? require(fs.realpathSync(cli.args[0])) : null;
 
 if (cluster.isMaster) {
+  var workers = [];
   if (custom_indexer && custom_indexer.sharded) {
     var ranges = [];
     if (custom_indexer.sharded.ranges) {
       ranges = custom_indexer.sharded.ranges;
     } else {
       var now = moment();
+      if (!custom_indexer.sharded.start) {
+        throw new Error("Start time has to be defined in sharded indexer.")
+      }
       var start = moment(custom_indexer.sharded.start);
       var end = custom_indexer.sharded.end ? moment(custom_indexer.sharded.end) : now;
+      if (!start) {
+        throw new Error("Start of the range has to be specified for sharded indexer.");
+      }
       var current = start;
       var interval_days = 1;
-      switch(custom_indexer.sharded.interval) {
-        case 'month':
-          interval_days = 30;
-          break;
-        case 'week':
-          interval_days = 7;
-          break;
-        default:
-          interval_days = parseInt(custom_indexer.sharded.interval);
+      if (custom_indexer.sharded.interval) {
+        switch(custom_indexer.sharded.interval) {
+          case 'month':
+            interval_days = 30;
+            break;
+          case 'week':
+            interval_days = 7;
+            break;
+          default: {
+            var days = parseInt(custom_indexer.sharded.interval);
+            if (days) interval_days = days;
+          }
+        }
+      } else {
+        interval_days = Math.ceil(end.diff(start, 'days') / cli.concurrency);
       }
-      while(current < end){
+      do {
         var current_end = current.clone().add(interval_days, 'days');
         if (current_end > end) {
           current_end = end;
@@ -75,16 +86,35 @@ if (cluster.isMaster) {
           }
         });
         current = current_end;
-      }
+      } while (current < end);
     }
     ranges.forEach(function(shard) {
       var worker_arg = {range:{}, name: shard.name};
       worker_arg.range[custom_indexer.sharded.field] = shard.range;
-      cluster.fork({worker_arg:JSON.stringify(worker_arg)});
+      workers.push(worker_arg);
     });
   } else {
-    cluster.fork();
+    workers.push({name: "single"})
   }
+
+  console.log("Starting reindex in " + workers.length + " shards.")
+  if (workers.length > 1 & cli.max_docs > -1) console.log("Warning: every worker in his range will only index limited documents when max_docs used");
+  var bar = new ProgressBar(" reindexing [:bar] :current/:total(:percent) :elapsed :etas - :shards/"+workers.length+" working", {total:0, width:30});
+  var docs = {};
+  workers.forEach(function(args) {
+    var worker = cluster.fork({worker_arg:JSON.stringify(args)});
+    worker.on('message', function(msg) {
+      if (msg.total) {
+        var cnt = Object.keys(docs).length;
+        docs[msg.pid] = msg.total;
+        if (cnt < Object.keys(docs).length) {
+          bar.total = bar.total + msg.total;
+        }
+      }
+      else bar.tick(msg.success, {shards: Object.keys(docs).length});
+    });
+  });
+
   cluster.on('exit', function(worker, code, signal) {
     if( signal ) {
       logger.fatal("worker was killed by signal: "+signal);
@@ -92,8 +122,15 @@ if (cluster.isMaster) {
     } else if( code !== 0 ) {
       logger.fatal("worker exited with error code: "+code);
       console.log("worker exited with error code: "+code);
-    } else {
-      console.log('    Worker finished its work!');
+    }
+
+    delete docs[worker.process.pid];
+
+    if (Object.keys(cluster.workers).length === 0) {
+      if (bar.total === bar.curr)
+        console.log('Reindexing completed sucessfully.');
+      else
+        console.log('Failed to reindex ' + (bar.total - bar.curr) + ' (~'+ Math.round((100-(bar.curr/bar.total)*100)*1000)/1000 +'%) documents.');
     }
   });
 } else {
@@ -104,33 +141,39 @@ if (cluster.isMaster) {
   if (process.env.worker_arg) {
     worker_arg = JSON.parse(process.env.worker_arg);
     range = worker_arg.range;
-    shard_name = worker_arg.name;
+    shard_name = cluster.worker.id;
   }
 
-  var from_uri      = new URI(cli.from),
-      to_uri        = new URI(cli.to),
-      from_host     = cli.from.replace(new RegExp(escapeRegExp(from_uri.path()) + '.*'), ''),
-      to_host       = cli.to.replace(new RegExp(escapeRegExp(to_uri.path()) + '.*'), '');
-
-  // If no path was supplied, URIjs will always return '/' from `MyURI.path()`
-  // We should strip the trailing slash if present and provide the rest of
-  // the host string to the client.
-  if (from_uri.path() === '/') {
-    from_host = cli.from.replace(/\/$/, '');
+  function createClient(uri) {
+    var uri = uri.lastIndexOf('/') === uri.length -1 ? uri.substr(0, uri.length -1) : uri;
+    tokens = uri.split('/');
+    var res = {};
+    if (tokens.length >= 4) {
+      res.type = tokens.pop();
+      res.index = tokens.pop();
+    }
+    res.host = tokens.join('/');
+    res.client = new elasticsearch.Client({
+      host: res.host,
+      requestTimeout: cli.request_timeout,
+      apiVersion: cli.api_ver,
+      suggestCompression: cli.compress
+    });
+    return res;
   }
-  if (to_uri.path() === '/') {
-    to_host = cli.to.replace(/\/$/, '');
+
+  if (!cli.from || !cli.to) {
+    throw new Error('"from" and "to" parameters are required');
   }
 
-  var from_client   = new elasticsearch.Client({ host: from_host, requestTimeout: cli.request_timeout, apiVersion: cli.api_ver, suggestCompression: cli.compress }),
-      to_client     = new elasticsearch.Client({ host: to_host, requestTimeout: cli.request_timeout, apiVersion: cli.api_ver, suggestCompression: cli.compress }),
-      from_path     = (function() { var tmp = from_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}; })(),
-      to_path       = (function() { var tmp = to_uri.path().split('/'); return { index:tmp[1], type:tmp[2]}; })(),
-      processed_total        = 0,
-      processed_failed       = 0;
+  var from = createClient(cli.from);
+      to = createClient(cli.to),
+      processed_total = 0,
+      processed_failed = 0;
+
   var scan_options = {
-        index       : from_path.index,
-        type        : from_path.type,
+        index       : from.index,
+        type        : from.type,
         search_type : 'scan',
         scroll      : cli.scroll,
         size        : cli.query_size,
@@ -146,7 +189,6 @@ if (cluster.isMaster) {
   }
 
   var reindexer = new Indexer();
-  var bar = new ProgressBar("    " + shard_name + " reindexing [:bar] :current/:total(:percent) :elapsed :etas", {total:100, width:30});
 
   reindexer.on('item-failed', function(item) {
     processed_failed++;
@@ -158,44 +200,48 @@ if (cluster.isMaster) {
   });
 
   reindexer.on('batch-complete', function(num_of_success) {
-    console.log("\n");
-    bar.tick(num_of_success);
+    process.send({success: num_of_success});
   });
 
-  from_client.search(scan_options, function scroll_fetch(err, res) {
+  from.client.search(scan_options, function scroll_fetch(err, res) {
     if (err) {
       logger.fatal(err);
-      return console.log("Scroll error:" + err);
+      if (err.message.indexOf('parse') > -1) {
+        throw new Error("Scroll body parsing error, query_size param is possiblly too high.");
+      } else {
+        throw new Error("Scroll error: " + err);
+      }
     }
     if (!res.hits.total) {
       logger.info('No documents can be found!');
-      console.log('No documents can be found!');
       return process.exit();
     }
-    bar.total = cli.max_docs === -1 ? res.hits.total : (cli.max_docs > res.hits.total ? res.hits.total : cli.max_docs);
+    var total = cli.max_docs === -1 ? res.hits.total : (cli.max_docs > res.hits.total ? res.hits.total : cli.max_docs);
+    total = parseInt(total);
+    process.send({total: total, pid: process.pid});
     var docs = res.hits.hits,
       reindexMethod = cli.promise ? 'indexPromise' : 'index';
 
     processed_total = processed_total + docs.length;
-    if (processed_total > bar.total) {
-      docs = docs.slice(0, bar.total - processed_total);
-      processed_total = bar.total;
+    if (processed_total > total) {
+      docs = docs.slice(0, total - processed_total);
+      processed_total = total;
     }
     reindexer[reindexMethod](docs, {
       concurrency : cli.concurrency,
       bulk        : cli.bulk,
-      client      : to_client,
+      client      : to.client,
       indexer     : custom_indexer ? custom_indexer.index : null,
-      index       : to_path.index,
-      type        : to_path.type,
+      index       : to.index,
+      type        : to.type,
       parent      : cli.parent
     }, function(err) {
       if (err) {
         logger.fatal(err);
-        return console.log("Reindex error: " + err);
+        return console.log("\nReindex error: " + err);
       }
-      if (processed_total < bar.total) {
-        from_client.scroll({
+      if (processed_total < total) {
+        from.client.scroll({
           body : res._scroll_id,
           scroll : cli.scroll
         }, scroll_fetch);
@@ -204,7 +250,6 @@ if (cluster.isMaster) {
         if (processed_failed) {
           msg +=   " about " + processed_failed + " documents reindex failed, see the " + cli.log_path;
         }
-        console.log("\n" + msg);
         logger.info(msg);
         process.exit();
       }
