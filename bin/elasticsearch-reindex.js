@@ -27,6 +27,9 @@ cli
 .option('-p, --parent [value]', 'if set, uses this field as parent field', '')
 .option('-m, --promise [value]', 'if set indexes expecting promises, default: false', false)
 .option('-z, --compress [value]', 'if set, requests compression of data in transit', false)
+.option('-a, --access_key [value]', 'AWS access key', false)
+.option('-k, --secret_key [value]', 'AWS secret ket', false)
+.option('-e, --region [value]', 'AWS region', false)
 .parse(process.argv);
 
 var logger = bunyan.createLogger({
@@ -152,13 +155,25 @@ if (cluster.isMaster) {
       res.type = tokens.pop();
       res.index = tokens.pop();
     }
-    res.host = tokens.join('/');
-    res.client = new elasticsearch.Client({
-      host: res.host,
+
+    var config = {
       requestTimeout: cli.request_timeout,
       apiVersion: cli.api_ver,
       suggestCompression: cli.compress
-    });
+    };
+
+    if (cli.access_key && cli.secret_key && cli.region && /\.amazonaws\./.test(uri)) {
+      config.connectionClass = require('http-aws-es');
+      config.amazonES = {
+        accessKey: cli.access_key,
+        secretKey: cli.secret_key,
+        region: cli.region
+      };
+    }
+
+    config.host = res.host = tokens.join('/');
+
+    res.client = new elasticsearch.Client(config);
     return res;
   }
 
