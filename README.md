@@ -25,6 +25,12 @@ You can omit {new_index} and {new_type} if new index name and type name same as 
 $ elasticsearch-reindex -f http://192.168.1.100:9200/old_index/old_type -t http://10.0.0.1:9200
 ```
 
+If you're using the Amazon Elasticsearch Service you can provide your access and secret keys and region.
+
+```
+$ elasticsearch-reindex -f http://123.es.amazonaws.com -t http://10.0.0.1:9200 --region us-east-1 --access_key ABC --secret_key 123
+```
+
 Advanced feature
 ----------------
 
