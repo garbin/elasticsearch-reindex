@@ -148,6 +148,10 @@ if (cluster.isMaster) {
   }
 
   function createClient(uri) {
+    if (!/\w+:\/\//.test(uri)) {
+      uri = 'http://' + uri;
+    }
+
     var uri = uri.lastIndexOf('/') === uri.length -1 ? uri.substr(0, uri.length -1) : uri;
     tokens = uri.split('/');
     var res = {};
@@ -159,7 +163,9 @@ if (cluster.isMaster) {
     var config = {
       requestTimeout: cli.request_timeout,
       apiVersion: cli.api_ver,
-      suggestCompression: cli.compress
+      suggestCompression: cli.compress,
+      sniffOnStart: true,
+      sniffOnConnectionFault: true
     };
 
     if (cli.access_key && cli.secret_key && cli.region && /\.amazonaws\./.test(uri)) {
@@ -222,7 +228,7 @@ if (cluster.isMaster) {
     if (err) {
       logger.fatal(err);
       if (err.message.indexOf('parse') > -1) {
-        throw new Error("Scroll body parsing error, query_size param is possiblly too high.");
+        throw new Error("Scroll body parsing error, query_size param is possibly too high.");
       } else {
         throw new Error("Scroll error: " + err);
       }
