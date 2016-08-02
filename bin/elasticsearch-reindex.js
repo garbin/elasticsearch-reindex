@@ -19,11 +19,13 @@ cli
 .option('-b, --bulk [value]', 'bulk size for a thread', 100)
 .option('-q, --query_size [value]', 'query size for scroll', 100)
 .option('-s, --scroll [value]', 'default 1m', '1m')
+.option('-i, --sniff_cluster [value]', 'sniff the rest of the cluster upon initial connection and connection errors', true)
 .option('-o, --request_timeout [value]', 'default 60000', 60000)
 .option('-l, --log_path [value]', 'default ./reindex.log', './reindex.log')
 .option('-r, --trace', 'default false', false)
 .option('-n, --max_docs [value]', 'default -1 unlimited', -1)
-.option('-v, --api_ver [value]', 'default 1.5', '1.5')
+.option('--from_ver [value]', 'default 1.5', '1.5')
+.option('--to_ver [value]', 'default 1.5', '1.5')
 .option('-p, --parent [value]', 'if set, uses this field as parent field', '')
 .option('-m, --promise [value]', 'if set indexes expecting promises, default: false', false)
 .option('-z, --compress [value]', 'if set, requests compression of data in transit', false)
@@ -31,6 +33,16 @@ cli
 .option('-k, --secret_key [value]', 'AWS secret ket', false)
 .option('-e, --region [value]', 'AWS region', false)
 .parse(process.argv);
+
+for (var key in cli) {
+  if (cli.hasOwnProperty(key)) {
+    if (cli[key] === 'false') {
+      cli[key] = false;
+    } else if (cli[key] === 'true') {
+      cli[key] = true;
+    }
+  }
+}
 
 var logger = bunyan.createLogger({
   src: true,
@@ -147,7 +159,11 @@ if (cluster.isMaster) {
     shard_name = cluster.worker.id;
   }
 
-  function createClient(uri) {
+  function createClient(uri, apiVersion) {
+    if (!/\w+:\/\//.test(uri)) {
+      uri = 'http://' + uri;
+    }
+
     var uri = uri.lastIndexOf('/') === uri.length -1 ? uri.substr(0, uri.length -1) : uri;
     tokens = uri.split('/');
     var res = {};
@@ -158,8 +174,10 @@ if (cluster.isMaster) {
 
     var config = {
       requestTimeout: cli.request_timeout,
-      apiVersion: cli.api_ver,
-      suggestCompression: cli.compress
+      apiVersion: apiVersion,
+      suggestCompression: cli.compress,
+      sniffOnStart: cli.sniff_cluster,
+      sniffOnConnectionFault: cli.sniff_cluster
     };
 
     if (cli.access_key && cli.secret_key && cli.region && /\.amazonaws\./.test(uri)) {
@@ -181,8 +199,8 @@ if (cluster.isMaster) {
     throw new Error('"from" and "to" parameters are required');
   }
 
-  var from = createClient(cli.from);
-      to = createClient(cli.to),
+  var from = createClient(cli.from, cli.from_ver);
+      to = createClient(cli.to, cli.to_ver),
       processed_total = 0,
       processed_failed = 0;
 
@@ -220,9 +238,12 @@ if (cluster.isMaster) {
 
   from.client.search(scan_options, function scroll_fetch(err, res) {
     if (err) {
+      if (err.message instanceof Error) {
+        err = err.message;
+      }
       logger.fatal(err);
       if (err.message.indexOf('parse') > -1) {
-        throw new Error("Scroll body parsing error, query_size param is possiblly too high.");
+        throw new Error("Scroll body parsing error, query_size param is possibly too high.");
       } else {
         throw new Error("Scroll error: " + err);
       }
