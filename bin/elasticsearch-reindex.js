@@ -22,7 +22,6 @@ cli
 .option('-i, --sniff_cluster [value]', 'sniff the rest of the cluster upon initial connection and connection errors', true)
 .option('-o, --request_timeout [value]', 'default 60000', 60000)
 .option('-l, --log_path [value]', 'default ./reindex.log', './reindex.log')
-.option('-r, --trace', 'default false', false)
 .option('-n, --max_docs [value]', 'default -1 unlimited', -1)
 .option('--from_ver [value]', 'default 1.5', '1.5')
 .option('--to_ver [value]', 'default 1.5', '1.5')
