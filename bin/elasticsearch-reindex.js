@@ -2,6 +2,7 @@
 
 var cli           = require('commander'),
     elasticsearch = require('elasticsearch'),
+    AgentKeepAlive = require('agentkeepalive'),
     cluster       = require('cluster'),
     moment        = require('moment'),
     _             = require('underscore'),
@@ -190,7 +191,17 @@ if (cluster.isMaster) {
 
     config.host = res.host = tokens.join('/');
 
-    res.client = new elasticsearch.Client(config);
+    res.client = new elasticsearch.Client({
+        hosts: [tokens[2]],
+        maxRetries: 10,
+        keepAlive: true,
+        maxSockets: 10,
+        minSockets: 10,
+        createNodeAgent: function (connection, config) {
+          return new AgentKeepAlive(connection.makeAgentConfig(config));
+        }
+      }
+    );
     return res;
   }
 
