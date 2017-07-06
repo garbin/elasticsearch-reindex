@@ -11,6 +11,28 @@ var cli           = require('commander'),
     fs            = require('fs'),
     Indexer       = require('../lib/indexer');
 
+function make_scan_opts(from, cli) {
+  if (cli.from_ver === '1.7' || cli.from_ver === '0.90') {
+    return {
+      index       : from.index,
+      type        : from.type,
+      search_type : 'scan',
+      scroll      : cli.scroll,
+      size        : cli.query_size,
+      body        : {}
+    };
+  }
+
+  return {
+    index       : from.index,
+    type        : from.type,
+    scroll      : cli.scroll,
+    size        : cli.query_size,
+    body        : {
+      sort: "_doc"
+    }
+  };
+}
 
 cli
 .version('1.1.11')
@@ -24,8 +46,8 @@ cli
 .option('-o, --request_timeout [value]', 'default 60000', 60000)
 .option('-l, --log_path [value]', 'default ./reindex.log', './reindex.log')
 .option('-n, --max_docs [value]', 'default -1 unlimited', -1)
-.option('--from_ver [value]', 'default 1.5', '1.5')
-.option('--to_ver [value]', 'default 1.5', '1.5')
+.option('--from_ver [value]', 'default 1.7', '1.7')
+.option('--to_ver [value]', 'default 1.7', '1.7')
 .option('-p, --parent [value]', 'if set, uses this field as parent field', '')
 .option('-m, --promise [value]', 'if set indexes expecting promises, default: false', false)
 .option('-z, --compress [value]', 'if set, requests compression of data in transit', false)
@@ -214,14 +236,7 @@ if (cluster.isMaster) {
       processed_total = 0,
       processed_failed = 0;
 
-  var scan_options = {
-        index       : from.index,
-        type        : from.type,
-        search_type : 'scan',
-        scroll      : cli.scroll,
-        size        : cli.query_size,
-        body        : {}
-      };
+  var scan_options = make_scan_opts(from, cli);
 
   if (range) {
     _.defaults(scan_options.body, {query:{range:range}});
@@ -253,6 +268,7 @@ if (cluster.isMaster) {
       }
       logger.fatal(err);
       if (err.message.indexOf('parse') > -1) {
+        console.log(err);
         throw new Error("Scroll body parsing error, query_size param is possibly too high.");
       } else {
         throw new Error("Scroll error: " + err);
@@ -288,7 +304,7 @@ if (cluster.isMaster) {
       }
       if (processed_total < total) {
         from.client.scroll({
-          body : res._scroll_id,
+          scroll_id : res._scroll_id,
           scroll : cli.scroll
         }, scroll_fetch);
       } else {
