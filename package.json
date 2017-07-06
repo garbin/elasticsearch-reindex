@@ -3,9 +3,7 @@
   "version": "1.1.15",
   "description": "Elasticsearch reindex tool",
   "main": "index.js",
-  "scripts": {
-    "test": "npm test"
-  },
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/garbin/elasticsearch-reindex.git"
