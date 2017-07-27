@@ -187,7 +187,7 @@ if (cluster.isMaster) {
     }
 
     var uri = uri.lastIndexOf('/') === uri.length -1 ? uri.substr(0, uri.length -1) : uri;
-    tokens = uri.split('/');
+    var tokens = uri.split('/');
     var res = {};
     if (tokens.length >= 4) {
       res.type = tokens.pop();
@@ -213,14 +213,34 @@ if (cluster.isMaster) {
 
     config.host = res.host = tokens.join('/');
 
+    if (tokens[2].indexOf("@") !== -1) {
+        var data = tokens[2].split("@");
+        tokens[1] = data[0];
+        tokens[2] = data[1];
+    }
+
+
+    if (tokens[2].indexOf(":") !== -1) {
+        var hostData = tokens[2].split(":");
+        tokens[2] = hostData[0];
+        tokens[3] = hostData[1];
+    }
     res.client = new elasticsearch.Client({
-        hosts: [tokens[2]],
+        hosts: [{
+        host: tokens[2],
+        protocol: tokens[0].replace(":", ""),
+        auth: tokens[1] != "" ? tokens[1] : null,
+        port: tokens[3] != "" ? tokens[3] : "9200",
+        }],
         maxRetries: 10,
         keepAlive: true,
         maxSockets: 10,
         minSockets: 10,
         createNodeAgent: function (connection, config) {
-          return new AgentKeepAlive(connection.makeAgentConfig(config));
+            if("https" === config.hosts[0].protocol) {
+            return new AgentKeepAlive.HttpsAgent(connection.makeAgentConfig(config));
+            }
+            return new AgentKeepAlive(connection.makeAgentConfig(config));
         }
       }
     );
